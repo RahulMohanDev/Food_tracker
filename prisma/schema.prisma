@@ -1,0 +1,78 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  dailyGoals  DailyGoal[]
+  foodEntries FoodEntry[]
+}
+
+model Consumable {
+  id          String   @id @default(cuid())
+  name        String
+  calories    Float
+  protein     Float
+  carbs       Float
+  fat         Float
+  servingSize Float    // in grams
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  foodEntries FoodEntry[]
+}
+
+model DailyGoal {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  date      DateTime
+  calories  Float
+  protein   Float
+  carbs     Float
+  fat       Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  foodEntries FoodEntry[]
+
+  @@unique([userId, date])
+}
+
+model FoodEntry {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  date          DateTime
+  amount        Float       // in grams
+  consumableId  String?
+  consumable    Consumable? @relation(fields: [consumableId], references: [id])
+  dailyGoalId   String?
+  dailyGoal     DailyGoal?  @relation(fields: [dailyGoalId], references: [id])
+
+  // For manually entered or GPT-analyzed foods
+  name          String?
+  calories      Float
+  protein       Float
+  carbs         Float
+  fat           Float
+
+  // For image-based entries
+  imageUrl      String?
+  description   String?
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
