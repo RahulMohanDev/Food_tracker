@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { openai } from '@/lib/openai'
+import { logError } from '@/lib/logger'
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
   "fat": number (in grams - total fat)
 }
 
-Extract the values PER SERVING as shown on the label. If any value is not clearly visible, use 0.`,
+Extract the values PER SERVING as shown on the label. If any value is not clearly visible, omit that field from the JSON (don't use 0 or null).`,
         },
         {
           role: 'user',
@@ -55,7 +56,7 @@ Extract the values PER SERVING as shown on the label. If any value is not clearl
 
     return NextResponse.json(nutritionData)
   } catch (error) {
-    console.error('Error analyzing label:', error)
+    logError('POST /api/analyze-label', error, { hasImage: !!body.imageBase64 })
     return NextResponse.json({ error: 'Failed to analyze nutrition label' }, { status: 500 })
   }
 }

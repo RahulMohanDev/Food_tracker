@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(entries)
   } catch (error) {
+    console.error('Error fetching food entries:', error)
     return NextResponse.json({ error: 'Failed to fetch food entries' }, { status: 500 })
   }
 }

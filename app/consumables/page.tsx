@@ -38,7 +38,9 @@ export default function ConsumablesPage() {
 
   const fetchConsumables = async () => {
     try {
-      const res = await fetch('/api/consumables')
+      const res = await fetch('/api/consumables', {
+        headers: { 'x-user-id': userId || '' },
+      })
       const data = await res.json()
       setConsumables(Array.isArray(data) ? data : [])
     } catch (error) {
@@ -52,7 +54,10 @@ export default function ConsumablesPage() {
     try {
       const res = await fetch('/api/consumables', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId || '',
+        },
         body: JSON.stringify(formData),
       })
 
@@ -67,9 +72,13 @@ export default function ConsumablesPage() {
         })
         setShowForm(false)
         fetchConsumables()
+      } else {
+        const errorData = await res.json()
+        alert(errorData.error || 'Failed to add consumable. Please check all fields and try again.')
       }
     } catch (error) {
       console.error('Failed to create consumable:', error)
+      alert('Failed to add consumable. Please check your connection and try again.')
     }
   }
 
@@ -108,6 +117,10 @@ export default function ConsumablesPage() {
         body: JSON.stringify({ imageBase64 }),
       })
 
+      if (!analysisRes.ok) {
+        throw new Error('Failed to analyze label')
+      }
+
       const nutritionData = await analysisRes.json()
 
       setFormData({
@@ -122,9 +135,25 @@ export default function ConsumablesPage() {
       setShowAIForm(false)
       setShowForm(true)
       setLabelImage(null)
+
+      // Show message if fields are missing
+      const missingFields = []
+      if (!nutritionData.name) missingFields.push('name')
+      if (!nutritionData.calories) missingFields.push('calories')
+      if (!nutritionData.protein) missingFields.push('protein')
+      if (!nutritionData.carbs) missingFields.push('carbs')
+      if (!nutritionData.fat) missingFields.push('fat')
+      if (!nutritionData.servingSize) missingFields.push('serving size')
+
+      if (missingFields.length > 0) {
+        alert(`Some fields couldn't be detected: ${missingFields.join(', ')}. Please fill them in manually.`)
+      }
     } catch (error) {
       console.error('Label analysis failed:', error)
-      alert('Failed to analyze label. Please try again or enter manually.')
+      alert('Failed to analyze label. Please try uploading a clearer image or enter the information manually.')
+      setShowAIForm(false)
+      setShowForm(true)
+      setLabelImage(null)
     } finally {
       setAILoading(false)
     }

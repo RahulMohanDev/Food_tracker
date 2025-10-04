@@ -66,7 +66,9 @@ export default function TrackPage() {
 
   const fetchConsumables = async () => {
     try {
-      const res = await fetch('/api/consumables')
+      const res = await fetch('/api/consumables', {
+        headers: { 'x-user-id': userId || '' },
+      })
       const data = await res.json()
       setConsumables(Array.isArray(data) ? data : [])
     } catch (error) {
@@ -162,13 +164,23 @@ export default function TrackPage() {
         }),
       })
 
+      if (!analysisRes.ok) {
+        const errorData = await analysisRes.json()
+        throw new Error(errorData.error || 'Failed to analyze food')
+      }
+
       const nutritionData = await analysisRes.json()
+
+      // Validate nutrition data
+      if (!nutritionData.name || nutritionData.calories === undefined) {
+        throw new Error('AI returned incomplete data. Please try again or enter manually.')
+      }
 
       await fetchWithAuth('/api/food-entries', userId, {
         method: 'POST',
         body: JSON.stringify({
           date,
-          amount: nutritionData.servingSize,
+          amount: nutritionData.servingSize || 100,
           name: nutritionData.name,
           calories: nutritionData.calories,
           protein: nutritionData.protein,
@@ -182,6 +194,8 @@ export default function TrackPage() {
       fetchEntries()
     } catch (error) {
       console.error('AI analysis failed:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to analyze food'
+      alert(`${errorMessage}\n\nPlease try again with a clearer description/image, or use manual entry.`)
     } finally {
       setAILoading(false)
     }
@@ -195,6 +209,28 @@ export default function TrackPage() {
       fetchEntries()
     } catch (error) {
       console.error('Failed to delete entry:', error)
+    }
+  }
+
+  const handleDuplicate = async (entry: FoodEntry) => {
+    try {
+      await fetchWithAuth('/api/food-entries', userId, {
+        method: 'POST',
+        body: JSON.stringify({
+          date,
+          consumableId: entry.consumable?.id,
+          amount: entry.amount,
+          name: entry.name,
+          calories: entry.calories,
+          protein: entry.protein,
+          carbs: entry.carbs,
+          fat: entry.fat,
+        }),
+      })
+      fetchEntries()
+    } catch (error) {
+      console.error('Failed to duplicate entry:', error)
+      alert('Failed to duplicate entry. Please try again.')
     }
   }
 
@@ -462,24 +498,32 @@ export default function TrackPage() {
           <h2 className="text-xl font-semibold">Today's Entries</h2>
           {entries.map((entry) => (
             <div key={entry.id} className="bg-white p-4 rounded-lg shadow-md">
-              <div className="flex justify-between items-start">
+              <div className="flex flex-col gap-3">
                 <div>
                   <h3 className="font-semibold">
                     {entry.consumable?.name || entry.name} - {entry.amount}g
                   </h3>
-                  <div className="flex gap-4 text-sm text-gray-600 mt-1">
+                  <div className="flex flex-wrap gap-3 text-sm text-gray-600 mt-1">
                     <span>{entry.calories.toFixed(0)} cal</span>
                     <span>{entry.protein.toFixed(1)}g protein</span>
                     <span>{entry.carbs.toFixed(1)}g carbs</span>
                     <span>{entry.fat.toFixed(1)}g fat</span>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleDelete(entry.id)}
-                  className="text-red-600 hover:text-red-800"
-                >
-                  Delete
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleDuplicate(entry)}
+                    className="flex-1 bg-blue-100 text-blue-700 hover:bg-blue-200 px-4 py-2 rounded-lg font-medium text-sm"
+                  >
+                    Duplicate
+                  </button>
+                  <button
+                    onClick={() => handleDelete(entry.id)}
+                    className="flex-1 bg-red-100 text-red-700 hover:bg-red-200 px-4 py-2 rounded-lg font-medium text-sm"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             </div>
           ))}

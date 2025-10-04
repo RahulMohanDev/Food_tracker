@@ -10,9 +10,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model House {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  consumables Consumable[]
+}
+
 model User {
   id          String   @id @default(cuid())
   name        String   @unique
+  houseId     String
+  house       House    @relation(fields: [houseId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -28,6 +40,8 @@ model Consumable {
   carbs       Float
   fat         Float
   servingSize Float    // in grams
+  houseId     String
+  house       House    @relation(fields: [houseId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
