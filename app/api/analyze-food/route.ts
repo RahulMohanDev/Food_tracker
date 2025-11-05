@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { openai } from '@/lib/openai'
+import { getOpenAI } from '@/lib/openai'
 import { logError } from '@/lib/logger'
 
 export async function POST(request: NextRequest) {
@@ -68,7 +68,7 @@ Provide realistic estimates based on typical serving sizes. Do not include any m
       })
     }
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: 'gpt-4o',
       messages,
       max_tokens: 500,
