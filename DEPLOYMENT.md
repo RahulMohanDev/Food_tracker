@@ -1,310 +1,414 @@
-# Deployment Guide - Food Tracker
+# Deployment Guide
 
-This guide explains how to deploy the Food Tracker application to Digital Ocean or any other cloud provider using Docker.
+This guide will help you deploy the Food Tracker application to your DigitalOcean server with automated GitHub Actions deployment.
 
 ## Prerequisites
 
-- Docker installed on your server
-- OpenAI API Key
-- A cloud server (Digital Ocean Droplet, AWS EC2, etc.)
+- DigitalOcean Droplet (1GB Memory / 25GB Disk / Docker on Ubuntu 22.04)
+- GitHub repository with push access
+- OpenAI API key
 
-## Quick Start with Docker Compose
+## Production vs Development
 
-### 1. Clone the Repository
+This guide covers **production deployment** to your DigitalOcean server. Key differences:
+
+### Production Deployment (This Guide)
+- Runs on your DigitalOcean server with a public IP address
+- Uses Docker containers for consistent deployment
+- Accessible 24/7 at `http://YOUR_SERVER_IP:3000`
+- **No ngrok or tunneling needed** - your server has a real public IP
+- GitHub Actions automatically deploys when you push to main branch
+
+### Local Development
+- The `start-server.sh` script is for local development only
+- Uses ngrok to create temporary public URLs for testing webhooks/mobile devices
+- **Not used in production** - only for local development convenience
+- Your production app runs directly on the server's public IP
+
+## Initial Server Setup
+
+### 1. Connect to Your Server
 
 ```bash
-git clone <your-repo-url>
-cd food-tracker
+ssh root@your_server_ip
 ```
 
-### 2. Set Up Environment Variables
-
-Create a `.env` file in the root directory:
+### 2. Set Up a Non-Root User (if not already done)
 
 ```bash
-cp .env.example .env
+adduser deploy
+usermod -aG sudo deploy
+usermod -aG docker deploy
 ```
 
-Edit `.env` and add your OpenAI API key:
+**About the commands:**
+- `adduser deploy` - Creates a new user named 'deploy' (you'll be prompted for a password)
+- `usermod -aG sudo deploy` - Adds the user to the sudo group (allows running commands with admin privileges)
+- `usermod -aG docker deploy` - Adds the user to the docker group (allows running Docker without sudo)
+
+**Password Security:**
+- Use a **strong, unique password** (16+ characters with mix of upper/lowercase, numbers, special characters)
+- Save it in your password manager
+- You'll need it for sudo operations and emergency access
+- Optional: After setting up SSH keys, you can disable password authentication for better security
+
+**To disable password authentication later (optional, for maximum security):**
+```bash
+sudo nano /etc/ssh/sshd_config
+# Change or add: PasswordAuthentication no
+# Then: sudo systemctl restart sshd
+```
+
+### 3. Set Up SSH Key for GitHub Actions
+
+```bash
+# Switch to deploy user
+su - deploy
+
+# Generate SSH key for GitHub Actions
+ssh-keygen -t ed25519 -C "github-actions" -f ~/.ssh/github_actions_key -N ""
+
+# Display the public key (add this to authorized_keys)
+cat ~/.ssh/github_actions_key.pub >> ~/.ssh/authorized_keys
+
+# Display the private key (you'll need this for GitHub Secrets)
+cat ~/.ssh/github_actions_key
+```
+
+**Save the private key** - you'll need it for GitHub Secrets setup.
+
+### 4. Clone the Repository
+
+```bash
+# Create application directory
+sudo mkdir -p /opt/food-tracker
+sudo chown deploy:deploy /opt/food-tracker
+
+# Clone the repository
+cd /opt/food-tracker
+git clone https://github.com/YOUR_USERNAME/food-tracker.git .
+```
+
+### 5. Create Production Environment File
+
+```bash
+cd /opt/food-tracker
+nano .env
+```
+
+Add the following:
 
 ```env
 DATABASE_URL="file:/app/data/prod.db"
-OPENAI_API_KEY="your-actual-openai-api-key"
-NODE_ENV="production"
+OPENAI_API_KEY="your_actual_openai_api_key"
 ```
 
-### 3. Create Data Directory
+### 6. Create Data and Logs Directories
 
 ```bash
-mkdir -p data logs
+mkdir -p /opt/food-tracker/data
+mkdir -p /opt/food-tracker/logs
 ```
 
-### 4. Build and Run with Docker Compose
+### 7. Initial Deployment
 
 ```bash
-docker-compose up -d
+cd /opt/food-tracker
+./deploy.sh
 ```
 
-The application will be available at `http://localhost:3000`
+### 8. Configure Firewall (if needed)
 
-### 5. Check Logs
+```bash
+sudo ufw allow 3000/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw enable
+```
+
+## Accessing Your Application
+
+After deployment, your application is accessible via:
+
+### Direct Access (Default)
+```
+http://YOUR_SERVER_IP:3000
+```
+Replace `YOUR_SERVER_IP` with your DigitalOcean droplet's IP address.
+
+**Example:** If your server IP is `164.90.123.45`, visit `http://164.90.123.45:3000`
+
+### With Nginx Reverse Proxy (After Setup)
+```
+http://YOUR_SERVER_IP
+```
+No port needed when using Nginx on port 80.
+
+### With Domain Name and SSL (After Setup)
+```
+https://yourdomain.com
+```
+Professional setup with HTTPS encryption.
+
+### Testing the Connection
+
+From your local machine:
+```bash
+# Test basic connectivity
+curl http://YOUR_SERVER_IP:3000/api/consumables
+
+# Check if app is responding
+curl -I http://YOUR_SERVER_IP:3000
+```
+
+**Note:** Your app runs directly on the server's public IP. No ngrok, tunneling, or port forwarding is needed!
+
+## GitHub Actions Setup
+
+### 1. Add GitHub Secrets
+
+Go to your GitHub repository: **Settings > Secrets and variables > Actions**
+
+Add the following secrets:
+
+- **SERVER_HOST**: Your server IP address (e.g., `164.90.xxx.xxx`)
+- **SERVER_USERNAME**: `deploy`
+- **SSH_PRIVATE_KEY**: The private key from step 3 above (entire content)
+- **OPENAI_API_KEY**: Your OpenAI API key
+
+### 2. Test GitHub Actions
+
+Push a commit to the main branch:
+
+```bash
+git add .
+git commit -m "test: Trigger deployment"
+git push origin main
+```
+
+Watch the deployment in the **Actions** tab of your GitHub repository.
+
+## Testing Your Deployment
+
+After deploying (either via GitHub Actions or manually), verify everything is working:
+
+### 1. Check Container Status
+
+```bash
+ssh deploy@your_server_ip
+cd /opt/food-tracker
+docker-compose ps
+```
+
+You should see the `app` container in the "Up" state.
+
+### 2. View Application Logs
 
 ```bash
 docker-compose logs -f app
 ```
 
-### 6. Stop the Application
+Look for "ready started server on 0.0.0.0:3000" or similar messages.
+
+### 3. Test API Endpoints
+
+From your local machine:
 
 ```bash
-docker-compose down
+# Replace YOUR_SERVER_IP with your actual server IP
+export SERVER_IP="YOUR_SERVER_IP"
+
+# Test health endpoint
+curl http://$SERVER_IP:3000/api/consumables
+
+# Test with verbose output
+curl -v http://$SERVER_IP:3000
 ```
 
-## Deployment to Digital Ocean
+### 4. Test in Browser
 
-### Option 1: Using Docker on a Droplet
+Open your browser and visit:
+```
+http://YOUR_SERVER_IP:3000
+```
 
-1. **Create a Droplet**
-   - Log in to Digital Ocean
-   - Create a new Droplet (Ubuntu 22.04 recommended)
-   - Choose a plan (minimum $6/month should work)
-   - Add your SSH key
+You should see your Food Tracker application!
 
-2. **SSH into Your Droplet**
-   ```bash
-   ssh root@your-droplet-ip
-   ```
-
-3. **Install Docker**
-   ```bash
-   curl -fsSL https://get.docker.com -o get-docker.sh
-   sh get-docker.sh
-   ```
-
-4. **Install Docker Compose**
-   ```bash
-   apt-get update
-   apt-get install docker-compose-plugin
-   ```
-
-5. **Clone Your Repository**
-   ```bash
-   git clone <your-repo-url>
-   cd food-tracker
-   ```
-
-6. **Set Up Environment Variables**
-   ```bash
-   nano .env
-   ```
-   Add:
-   ```env
-   DATABASE_URL="file:/app/data/prod.db"
-   OPENAI_API_KEY="your-actual-openai-api-key"
-   NODE_ENV="production"
-   ```
-
-7. **Create Directories**
-   ```bash
-   mkdir -p data logs
-   ```
-
-8. **Run the Application**
-   ```bash
-   docker compose up -d
-   ```
-
-9. **Configure Firewall**
-   ```bash
-   ufw allow 22
-   ufw allow 3000
-   ufw enable
-   ```
-
-10. **Access Your Application**
-    - Visit `http://your-droplet-ip:3000`
-
-### Option 2: Using Nginx as Reverse Proxy (Recommended for Production)
-
-1. **Follow steps 1-8 from Option 1**
-
-2. **Install Nginx**
-   ```bash
-   apt-get install nginx
-   ```
-
-3. **Configure Nginx**
-   ```bash
-   nano /etc/nginx/sites-available/food-tracker
-   ```
-
-   Add:
-   ```nginx
-   server {
-       listen 80;
-       server_name your-domain.com;
-
-       location / {
-           proxy_pass http://localhost:3000;
-           proxy_http_version 1.1;
-           proxy_set_header Upgrade $http_upgrade;
-           proxy_set_header Connection 'upgrade';
-           proxy_set_header Host $host;
-           proxy_cache_bypass $http_upgrade;
-       }
-   }
-   ```
-
-4. **Enable the Site**
-   ```bash
-   ln -s /etc/nginx/sites-available/food-tracker /etc/nginx/sites-enabled/
-   nginx -t
-   systemctl restart nginx
-   ```
-
-5. **Configure Firewall**
-   ```bash
-   ufw allow 22
-   ufw allow 80
-   ufw allow 443
-   ufw enable
-   ```
-
-6. **Install SSL with Let's Encrypt (Optional but Recommended)**
-   ```bash
-   apt-get install certbot python3-certbot-nginx
-   certbot --nginx -d your-domain.com
-   ```
-
-## Manual Docker Build (Without Docker Compose)
-
-### Build the Image
+### 5. Check Database
 
 ```bash
-docker build -t food-tracker .
+ssh deploy@your_server_ip
+ls -lh /opt/food-tracker/data/
 ```
 
-### Run the Container
+You should see `prod.db` file created.
+
+### Troubleshooting Tests
+
+If something isn't working:
 
 ```bash
-docker run -d \
-  --name food-tracker \
-  -p 3000:3000 \
-  -e DATABASE_URL="file:/app/data/prod.db" \
-  -e OPENAI_API_KEY="your-api-key" \
-  -e NODE_ENV="production" \
-  -v $(pwd)/data:/app/data \
-  -v $(pwd)/logs:/app/logs \
-  --restart unless-stopped \
-  food-tracker
+# Check if container is running
+docker-compose ps
+
+# View recent logs
+docker-compose logs --tail=50 app
+
+# Check if port 3000 is listening
+sudo netstat -tulpn | grep 3000
+
+# Test localhost access from the server
+curl http://localhost:3000
+
+# Restart the application
+docker-compose restart
 ```
 
-## Environment Variables
+## Manual Deployment
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `DATABASE_URL` | SQLite database path | Yes |
-| `OPENAI_API_KEY` | OpenAI API key for AI features | Yes |
-| `NODE_ENV` | Node environment (production) | Yes |
-
-## Data Persistence
-
-The application uses volumes to persist data:
-
-- **Database**: `./data/prod.db` - Contains all user data, food entries, and consumables
-- **Logs**: `./logs/error.log` - Application error logs
-
-**Important**: Always backup the `./data` directory regularly!
-
-## Backup and Restore
-
-### Backup
+If you need to deploy manually:
 
 ```bash
-# Backup database
-cp data/prod.db data/prod.db.backup-$(date +%Y%m%d)
-
-# Or create a tar archive
-tar -czf backup-$(date +%Y%m%d).tar.gz data logs
+ssh deploy@your_server_ip
+cd /opt/food-tracker
+./deploy.sh
 ```
 
-### Restore
+## Nginx Reverse Proxy (Optional but Recommended)
+
+To serve your app on port 80 with a domain:
+
+### 1. Install Nginx
 
 ```bash
-# Stop the application
-docker-compose down
-
-# Restore database
-cp data/prod.db.backup-YYYYMMDD data/prod.db
-
-# Restart
-docker-compose up -d
+sudo apt update
+sudo apt install nginx -y
 ```
 
-## Monitoring
+### 2. Create Nginx Configuration
 
-### View Logs
 ```bash
-# Docker Compose
-docker-compose logs -f app
-
-# Docker
-docker logs -f food-tracker
+sudo nano /etc/nginx/sites-available/food-tracker
 ```
 
-### Check Container Status
+Add:
+
+```nginx
+server {
+    listen 80;
+    server_name your_domain.com;  # or use server IP
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### 3. Enable the Site
+
+```bash
+sudo ln -s /etc/nginx/sites-available/food-tracker /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+### 4. SSL with Let's Encrypt (Optional)
+
+```bash
+sudo apt install certbot python3-certbot-nginx -y
+sudo certbot --nginx -d your_domain.com
+```
+
+## Monitoring and Maintenance
+
+### View Application Logs
+
+```bash
+docker-compose logs -f
+```
+
+### View Container Status
+
 ```bash
 docker-compose ps
-# or
-docker ps
 ```
 
-### Application Error Logs
+### Restart Application
+
 ```bash
-tail -f logs/error.log
+cd /opt/food-tracker
+docker-compose restart
 ```
 
-## Updating the Application
+### Update Application
 
 ```bash
-# Pull latest code
-git pull
+cd /opt/food-tracker
+./deploy.sh
+```
 
-# Rebuild and restart
-docker-compose down
-docker-compose up -d --build
+### Backup Database
+
+```bash
+cp /opt/food-tracker/data/prod.db /opt/food-tracker/data/prod.db.backup-$(date +%Y%m%d)
 ```
 
 ## Troubleshooting
 
-### Container Won't Start
-- Check logs: `docker-compose logs app`
-- Verify environment variables are set correctly
-- Ensure ports are not already in use
+### Container won't start
 
-### Database Issues
-- Check that the `data` directory exists and has correct permissions
-- Verify DATABASE_URL points to `/app/data/prod.db`
-
-### API Errors
-- Check `logs/error.log` for detailed error messages
-- Verify OPENAI_API_KEY is valid
-
-### Port Already in Use
 ```bash
-# Find what's using port 3000
-lsof -i :3000
-# Kill the process or change the port in docker-compose.yml
+docker-compose logs app
 ```
+
+### Check disk space
+
+```bash
+df -h
+docker system df
+```
+
+### Clean up Docker resources
+
+```bash
+docker system prune -a
+```
+
+### Database migration issues
+
+```bash
+docker-compose exec app npx prisma migrate deploy
+```
+
+## Architecture
+
+- **Application**: Next.js app running on port 3000
+- **Database**: SQLite stored in `/opt/food-tracker/data/prod.db`
+- **Logs**: Stored in `/opt/food-tracker/logs`
+- **Container Management**: Docker Compose
+- **CI/CD**: GitHub Actions
 
 ## Security Recommendations
 
-1. **Always use HTTPS in production** (via Nginx + Let's Encrypt)
-2. **Keep your OpenAI API key secret** - never commit it to git
-3. **Regularly backup your database**
-4. **Keep Docker and system packages updated**
-5. **Use a firewall** to restrict access to necessary ports only
-6. **Consider using Docker secrets** for sensitive data in production
+1. Never commit `.env` files to git
+2. Regularly update your server: `sudo apt update && sudo apt upgrade`
+3. Use strong SSH keys and disable password authentication
+4. Keep your Docker images updated
+5. Regular database backups
+6. Monitor application logs for errors
+7. Use HTTPS in production (see Nginx SSL setup)
 
 ## Support
 
-For issues or questions, check the error logs at `/logs/error.log` first. The logging system captures all errors with timestamps and context.
+If you encounter issues, check:
+- Application logs: `docker-compose logs`
+- GitHub Actions logs in the Actions tab
+- Server resources: `htop` or `docker stats`
