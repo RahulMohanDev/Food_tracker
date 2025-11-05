@@ -197,7 +197,7 @@ After deploying (either via GitHub Actions or manually), verify everything is wo
 ```bash
 ssh deploy@your_server_ip
 cd /opt/food-tracker
-docker-compose ps
+docker compose ps
 ```
 
 You should see the `app` container in the "Up" state.
@@ -205,7 +205,7 @@ You should see the `app` container in the "Up" state.
 ### 2. View Application Logs
 
 ```bash
-docker-compose logs -f app
+docker compose logs -f app
 ```
 
 Look for "ready started server on 0.0.0.0:3000" or similar messages.
@@ -249,10 +249,10 @@ If something isn't working:
 
 ```bash
 # Check if container is running
-docker-compose ps
+docker compose ps
 
 # View recent logs
-docker-compose logs --tail=50 app
+docker compose logs --tail=50 app
 
 # Check if port 3000 is listening
 sudo netstat -tulpn | grep 3000
@@ -261,7 +261,7 @@ sudo netstat -tulpn | grep 3000
 curl http://localhost:3000
 
 # Restart the application
-docker-compose restart
+docker compose restart
 ```
 
 ## Manual Deployment
@@ -332,20 +332,20 @@ sudo certbot --nginx -d your_domain.com
 ### View Application Logs
 
 ```bash
-docker-compose logs -f
+docker compose logs -f
 ```
 
 ### View Container Status
 
 ```bash
-docker-compose ps
+docker compose ps
 ```
 
 ### Restart Application
 
 ```bash
 cd /opt/food-tracker
-docker-compose restart
+docker compose restart
 ```
 
 ### Update Application
@@ -366,7 +366,7 @@ cp /opt/food-tracker/data/prod.db /opt/food-tracker/data/prod.db.backup-$(date +
 ### Container won't start
 
 ```bash
-docker-compose logs app
+docker compose logs app
 ```
 
 ### Check disk space
@@ -385,7 +385,7 @@ docker system prune -a
 ### Database migration issues
 
 ```bash
-docker-compose exec app npx prisma migrate deploy
+docker compose exec app npx prisma migrate deploy
 ```
 
 ## Architecture
@@ -409,6 +409,6 @@ docker-compose exec app npx prisma migrate deploy
 ## Support
 
 If you encounter issues, check:
-- Application logs: `docker-compose logs`
+- Application logs: `docker compose logs`
 - GitHub Actions logs in the Actions tab
 - Server resources: `htop` or `docker stats`

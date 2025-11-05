@@ -29,13 +29,13 @@ jobs:
             # Export environment variables
             export OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"
 
-            # Build and deploy with docker-compose
-            docker-compose down
-            docker-compose build --no-cache
-            docker-compose up -d
+            # Build and deploy with docker compose
+            docker compose down
+            docker compose build --no-cache
+            docker compose up -d
 
             # Clean up old images
             docker image prune -f
 
             # Show status
-            docker-compose ps
+            docker compose ps

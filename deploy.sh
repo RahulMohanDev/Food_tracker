@@ -28,15 +28,15 @@ export $(cat .env | grep -v '^#' | xargs)
 
 # Stop existing containers
 echo "🛑 Stopping existing containers..."
-docker-compose down
+docker compose down
 
 # Build new images
 echo "🔨 Building Docker images..."
-docker-compose build --no-cache
+docker compose build --no-cache
 
 # Start containers
 echo "▶️  Starting containers..."
-docker-compose up -d
+docker compose up -d
 
 # Wait for health check
 echo "⏳ Waiting for application to be healthy..."
@@ -44,7 +44,7 @@ sleep 10
 
 # Check container status
 echo "📊 Container status:"
-docker-compose ps
+docker compose ps
 
 # Clean up old images
 echo "🧹 Cleaning up old Docker images..."
