@@ -34,6 +34,8 @@ export default function TrackPage() {
   const [showManualForm, setShowManualForm] = useState(false)
   const [showInventoryForm, setShowInventoryForm] = useState(false)
   const [showAIForm, setShowAIForm] = useState(false)
+  const [showAddToInventoryForm, setShowAddToInventoryForm] = useState(false)
+  const [selectedEntryForInventory, setSelectedEntryForInventory] = useState<FoodEntry | null>(null)
 
   const [manualFormData, setManualFormData] = useState({
     name: '',
@@ -231,6 +233,38 @@ export default function TrackPage() {
     } catch (error) {
       console.error('Failed to duplicate entry:', error)
       alert('Failed to duplicate entry. Please try again.')
+    }
+  }
+
+  const handleAddToInventory = (entry: FoodEntry) => {
+    setSelectedEntryForInventory(entry)
+    setShowAddToInventoryForm(true)
+  }
+
+  const handleSaveToInventory = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedEntryForInventory) return
+
+    try {
+      await fetchWithAuth('/api/consumables', userId, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: selectedEntryForInventory.name,
+          calories: selectedEntryForInventory.calories,
+          protein: selectedEntryForInventory.protein,
+          carbs: selectedEntryForInventory.carbs,
+          fat: selectedEntryForInventory.fat,
+          servingSize: selectedEntryForInventory.amount,
+        }),
+      })
+
+      setShowAddToInventoryForm(false)
+      setSelectedEntryForInventory(null)
+      fetchConsumables()
+      alert('Successfully added to inventory!')
+    } catch (error) {
+      console.error('Failed to add to inventory:', error)
+      alert('Failed to add to inventory. Please try again.')
     }
   }
 
@@ -494,6 +528,72 @@ export default function TrackPage() {
           </form>
         )}
 
+        {showAddToInventoryForm && selectedEntryForInventory && (
+          <form onSubmit={handleSaveToInventory} className="bg-white p-6 rounded-lg shadow-md mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Add to Inventory</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddToInventoryForm(false)
+                  setSelectedEntryForInventory(null)
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Food Name</label>
+                <input
+                  type="text"
+                  required
+                  value={selectedEntryForInventory.name || ''}
+                  onChange={(e) =>
+                    setSelectedEntryForInventory({
+                      ...selectedEntryForInventory,
+                      name: e.target.value,
+                    })
+                  }
+                  className="w-full border rounded-lg px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Serving Size (g)</label>
+                <input
+                  type="number"
+                  required
+                  step="0.1"
+                  value={selectedEntryForInventory.amount}
+                  onChange={(e) =>
+                    setSelectedEntryForInventory({
+                      ...selectedEntryForInventory,
+                      amount: parseFloat(e.target.value),
+                    })
+                  }
+                  className="w-full border rounded-lg px-3 py-2"
+                />
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="text-sm font-medium mb-2">Nutrition per serving:</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <span>Calories: {selectedEntryForInventory.calories.toFixed(0)}</span>
+                  <span>Protein: {selectedEntryForInventory.protein.toFixed(1)}g</span>
+                  <span>Carbs: {selectedEntryForInventory.carbs.toFixed(1)}g</span>
+                  <span>Fat: {selectedEntryForInventory.fat.toFixed(1)}g</span>
+                </div>
+              </div>
+            </div>
+            <button
+              type="submit"
+              className="w-full mt-4 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700"
+            >
+              Save to Inventory
+            </button>
+          </form>
+        )}
+
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Today's Entries</h2>
           {entries.map((entry) => (
@@ -517,6 +617,14 @@ export default function TrackPage() {
                   >
                     Duplicate
                   </button>
+                  {!entry.consumable && (
+                    <button
+                      onClick={() => handleAddToInventory(entry)}
+                      className="flex-1 bg-green-100 text-green-700 hover:bg-green-200 px-4 py-2 rounded-lg font-medium text-sm"
+                    >
+                      Add to Inventory
+                    </button>
+                  )}
                   <button
                     onClick={() => handleDelete(entry.id)}
                     className="flex-1 bg-red-100 text-red-700 hover:bg-red-200 px-4 py-2 rounded-lg font-medium text-sm"

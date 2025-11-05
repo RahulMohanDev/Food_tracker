@@ -1,6 +1,6 @@
 // Service Worker for Food Tracker PWA
-const CACHE_NAME = 'food-tracker-v6';
-const STATIC_CACHE = 'food-tracker-static-v6';
+const CACHE_NAME = 'food-tracker-v7';
+const STATIC_CACHE = 'food-tracker-static-v7';
 
 // Files to cache for offline use
 const STATIC_ASSETS = [

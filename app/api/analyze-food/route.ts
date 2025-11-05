@@ -3,9 +3,8 @@ import { openai } from '@/lib/openai'
 import { logError } from '@/lib/logger'
 
 export async function POST(request: NextRequest) {
-  let body: any = {}
   try {
-    body = await request.json()
+    const body = await request.json()
     const { imageBase64, description } = body
 
     if (!description && !imageBase64) {
