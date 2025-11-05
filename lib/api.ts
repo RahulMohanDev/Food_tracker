@@ -12,8 +12,8 @@ export async function fetchWithAuth(url: string, userId: string | null, options?
     throw new Error('Please select a user first')
   }
 
-  const headers: HeadersInit = {
-    ...createAuthHeaders(userId),
+  const headers: Record<string, string> = {
+    'x-user-id': userId,
   }
 
   // Only add Content-Type if there's a body
